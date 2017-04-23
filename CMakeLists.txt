@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.6)
+project(at_shell)
+
+set(CMAKE_C_STANDARD 11)
+
+set(SOURCE_FILES main.c)
+set(LS_SOURCE_FILES ls.c)
+set(CP_SOURCE_FILES cp.c)
+set(MKDIR_SOURCE_FILES mkdir.c)
+set(RM_SOURCE_FILES rm.c)
+set(MV_SOURCE_FILES mv.c)
+add_executable(at_shell ${SOURCE_FILES})
+add_executable(at_ls ${LS_SOURCE_FILES})
+add_executable(cp_ls ${CP_SOURCE_FILES})
+add_executable(rm_ls ${RM_SOURCE_FILES})
+add_executable(mkdir_ls ${MKDIR_SOURCE_FILES})
+add_executable(mv_ls ${MV_SOURCE_FILES})
