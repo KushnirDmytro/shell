@@ -81,11 +81,24 @@ int main(int argc, const char* argv[])
             else {
                 while(optind < argc) {
                     if (!wrong_options && !help_flag) {
-                        if (is_dir(argv[optind]) && recursive_delete) {
-                            delete_dir(argv[optind]);
-                        } else if (is_file(argv[optind])) {
-                            delete_file(argv[optind]);
-                        }
+                        if (!force_delete) {
+
+                            char str[2];
+                            printf("%s %s %s", "Are you sure want to delete ", argv[optind], "(y/n)");
+                            scanf("%1s", str);
+                            if (strcmp(str, "Y") == 0 || strcmp(str, "y") == 0) {
+                                if (is_dir(argv[optind]) && recursive_delete) {
+                                    delete_dir(argv[optind]);
+                                } else if (is_file(argv[optind])) {
+                                    delete_file(argv[optind]);
+                                }
+                            }
+                        }else
+                            if (is_dir(argv[optind]) && recursive_delete) {
+                                delete_dir(argv[optind]);
+                            } else if (is_file(argv[optind])) {
+                                delete_file(argv[optind]);
+                            }
                     }
                     optind++;
                 }
