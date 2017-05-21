@@ -22,9 +22,18 @@ static struct option long_options[] =
                 {"help", no_argument, &help_flag, 1},
         };
 
+int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+    int rv = remove(fpath);
+
+    if (rv)
+        perror(fpath);
+
+    return rv;
+}
 
 int delete_dir(const char* dirname) {
-    return nftw(dirname, remove, 64, FTW_DEPTH | FTW_PHYS);
+    return nftw(dirname, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
 int delete_file(const char* filename) {
