@@ -1,16 +1,18 @@
-#include <sys/types.h>
+// This is a personal academic project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <getopt.h>
 #include <string.h>
 #include <regex.h>
+#include <time.h>
+
 
 static regex_t regex;
 static int reti;
-char msgbuf[100];
 
 static int help_flag = 0;
 static int information_flag = 0;
@@ -21,8 +23,6 @@ static int wrong_options = 0;
 static int wrong_sort_opt = 0;
 static int path_or_mask = 0;
 static char *path_and_mask = NULL;
-static char *path = ".";
-static char *mask = NULL;
 static char *help = "ls [path|mask] [-I] [-h|--help] [--sort=U|S|t|X] [-r] – вивести список файлів";
 
 static struct option long_options[] =
@@ -32,17 +32,20 @@ static struct option long_options[] =
         };
 
 
-struct my_files {
+ struct my_files {
     char name[256];
     struct stat file_information[256];
 };
 
+typedef  struct my_files my_files;
+
 
 static int last_modification_cmp(const void *filea, const void *fileb)
 {
-    const struct my_files *dfilea = filea, *dfileb = fileb;
+    const my_files *dfilea = filea, *dfileb = fileb;
 
-    return dfilea->file_information->st_mtime   > dfileb->file_information->st_mtime? -1 : dfilea->file_information->st_mtime   < dfileb->file_information->st_mtime;
+    return dfileb->file_information->st_mtime - dfilea->file_information->st_mtime;
+   // return dfilea->file_information->st_mtime   > dfileb->file_information->st_mtime? -1 : dfilea->file_information->st_mtime   < dfileb->file_information->st_mtime;
 }
 
 static int name_cmp(const void *filea, const void *fileb)
@@ -62,23 +65,10 @@ static int size_cmp(const void *filea, const void *fileb)
 static int ext_cmp(const void *filea, const void *fileb)
 {
     const struct my_files *dfilea = filea, *dfileb = fileb;
-    char * exta = strtok(dfilea->name, '.');
-    char * extb = strtok(dfileb->name, '.');
-
-    char * last_exta;
-
-    while (exta != NULL){
-        last_exta = exta;
-        exta = strtok(NULL, '.');
-    }
-
-    char * last_extb;
-
-    while (extb != NULL){
-        last_extb = extb;
-        extb = strtok(NULL, '.');
-    }
-
+    char * exta = strchr(dfilea->name, '.');
+    char * extb= strchr(dfileb->name, '.');
+    if (exta == NULL) exta = "";
+    if (extb == NULL) extb = "";
     return strcmp(exta, extb);
 }
 
@@ -98,7 +88,7 @@ int main(int argc, const char* argv[])
     int opt;
     int option_index;
 
-   struct my_files* list_of_files = malloc(256 * sizeof *list_of_files);
+   struct my_files* list_of_files = malloc(256 * sizeof(my_files) );
 
 
     while (optind < argc) {
@@ -175,75 +165,53 @@ int main(int argc, const char* argv[])
         {
             while ((dir = readdir(d)) != NULL)
             {
-                stat(dir->d_name, list_of_files[number_of_files].file_information);
-                strcpy(list_of_files[number_of_files].name, dir->d_name);
-                number_of_files++;
+                if (strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..")) {
+                    stat(dir->d_name, list_of_files[number_of_files].file_information);
+                    strcpy(list_of_files[number_of_files].name, dir->d_name);
+                    number_of_files++;
+                }
             }
 
             closedir(d);
         }
 
-        sort_flag = 1;
-        sort_value = "S";
+
         if (sort_flag){
             if (strcmp(sort_value, "S") == 0)
-            {qsort(list_of_files, number_of_files, sizeof(struct my_files *), size_cmp);}
+            {qsort(list_of_files, number_of_files, sizeof(struct my_files), size_cmp);}
             else if (strcmp(sort_value, "N") == 0)
-            {qsort(list_of_files, number_of_files, sizeof(struct my_files *), name_cmp);}
+            {qsort(list_of_files, number_of_files, sizeof(struct my_files), name_cmp);}
             else if (strcmp(sort_value, "t") == 0)
-            {qsort(list_of_files, number_of_files, sizeof(struct my_files *), last_modification_cmp);}
+            {qsort(list_of_files, number_of_files, sizeof(struct my_files), last_modification_cmp);}
             else if (strcmp(sort_value, "X") == 0)
-            {qsort(list_of_files, number_of_files, sizeof(struct my_files *), ext_cmp);}
+            {qsort(list_of_files, number_of_files, sizeof(struct my_files), ext_cmp);}
         }
-        else qsort(list_of_files, number_of_files, sizeof(struct my_files *), name_cmp);
+        else qsort(list_of_files, number_of_files, sizeof(struct my_files), name_cmp);
 
-        if (reverse_flag)
-        {
-            for (int j = number_of_files - 1; j >= 0; j--)
+            int file_number;
+            for (int j = 0; j < number_of_files; j++)
             {
+                if (reverse_flag) file_number = number_of_files - j - 1;
+                else file_number = j;
+
+
                 if (path_or_mask) {
-                        reti = regexec(&regex, list_of_files[j].name, 0, NULL, 0);
+                    reti = regexec(&regex, list_of_files[file_number].name, 0, NULL, 0);
+                } else reti = 0;
                         if(!reti)
                         {
                         if (information_flag) {
-                            printf("%s %i %i\n", list_of_files[j].name,
-                                   list_of_files[j].file_information->st_size,
-                                   list_of_files[j].file_information->st_mtime);
-                        } else printf("%s\n", list_of_files[j].name);
+                            printf("%-20s %-10i %-20s\n", list_of_files[file_number].name,
+                                   list_of_files[file_number].file_information->st_size,
+                                   ctime(&list_of_files[file_number].file_information->st_mtime));
+                        } else printf("%-20s\n", list_of_files[file_number].name);
                     }
-                } else
-                {
-                    if (information_flag) {
-                        printf("%s %i %i\n", list_of_files[j].name,
-                               list_of_files[j].file_information->st_size,
-                               list_of_files[j].file_information->st_mtime);
-                    } else printf("%s\n", list_of_files[j].name);
-                }
             }
         }
-        else {
-            for (int j = 0; j < number_of_files; j++){
-                if (path_or_mask) {
-                    reti = regexec(&regex, list_of_files[j].name, 0, NULL, 0);
-                    if(!reti)
-                    {
-                        if (information_flag) {
-                            printf("%s %i %i\n", list_of_files[j].name,
-                                   list_of_files[j].file_information->st_size,
-                                   list_of_files[j].file_information->st_mtime);
-                        } else printf("%s\n", list_of_files[j].name);
-                    }
-                } else
-                {
-                    if (information_flag) {
-                        printf("%s %i %i\n", list_of_files[j].name,
-                               list_of_files[j].file_information->st_size,
-                               list_of_files[j].file_information->st_mtime);
-                    } else printf("%s\n", list_of_files[j].name);
-                }
-            }
-        }
-    }
+
+
+
+
     return 0;
 }
 

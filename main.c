@@ -1,11 +1,12 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 
 int shell_pwd(int argc, const char * argv[]);
@@ -13,22 +14,6 @@ int shell_cd(int argc, const char * argv[]);
 int shell_exit(int argc, const char * argv[]);
 static int help_flag = 0;
 char *cwd_bufer;
-
-char *external_commands[] = {
-    "ls",
-    "mkdir",
-    "mv",
-    "rm",
-    "cp"
-};
-char *external_commands_paths[] = {
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_ls",
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_mkdir",
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_mv",
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_rm",
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_cp",
-};
-
 long path_max;
 
 int shell_pwd(int argc, const char * argv[]){
@@ -237,11 +222,8 @@ int external_execute(int argc, const char * argv[]) {
             /*handle error*/
         case 0:
             /*perform action specific to child*/
-            for (int i = 0; i < sizeof(external_commands); i++){
-                if (strcmp(external_commands[i], argv[0]) == 0)
-                {
-                     execution_return = execv(external_commands_paths[i], argv);
-                }
+            {
+                execution_return = execvp(argv[0], argv);
             }
         default:
             if (wait(NULL) == -1){
@@ -312,6 +294,17 @@ int loop(){
 
 int main(){
     int exit_code;
+    char *original_path;
+    char environment_var[1024] = "PATH=";
+
+    original_path = getcwd(cwd_bufer, 1024);
+    strcat(environment_var, original_path);
+    putenv(environment_var);
+    const char* s = getenv("PATH");
+    printf("PATH :%s\n",(s!=NULL)? s : "getenv returned NULL");
+    printf("end test\n");
+
+
 
     exit_code = loop();
 
