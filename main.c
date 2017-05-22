@@ -16,11 +16,17 @@ char *cwd_bufer;
 
 char *external_commands[] = {
     "ls",
-    "mkdir"
+    "mkdir",
+    "mv",
+    "rm",
+    "cp"
 };
 char *external_commands_paths[] = {
     "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_ls",
-    "/home/baget/CLionProjects/at_shell/cmake-build-debug/mkdir_ls"
+    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_mkdir",
+    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_mv",
+    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_rm",
+    "/home/baget/CLionProjects/at_shell/cmake-build-debug/at_cp",
 };
 
 long path_max;
