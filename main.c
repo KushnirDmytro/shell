@@ -271,9 +271,10 @@ int loop(){
         // make path shorter to improve user experience
         if (strlen(cp_ptr) > 30){
             cp_ptr = cp_ptr + strlen(cp_ptr) - 30;
-            printf("%s", "...");
-        }
-        printf("%s ", cp_ptr);
+            printf("%s%-30s", "...", cp_ptr);
+        } else printf("%-33s", cp_ptr);
+        printf("$ ");
+
 
 
 
@@ -300,11 +301,6 @@ int main(){
     original_path = getcwd(cwd_bufer, 1024);
     strcat(environment_var, original_path);
     putenv(environment_var);
-    const char* s = getenv("PATH");
-    printf("PATH :%s\n",(s!=NULL)? s : "getenv returned NULL");
-    printf("end test\n");
-
-
 
     exit_code = loop();
 
