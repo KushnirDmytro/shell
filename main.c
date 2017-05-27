@@ -7,7 +7,11 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/wait.h>
+#include <regex.h>
 
+
+static regex_t regex;
+static int reti;
 
 int shell_pwd(int argc, const char * argv[]);
 int shell_cd(int argc, const char * argv[]);
@@ -213,6 +217,15 @@ char * read_line() {
     return line;
 }
 
+int count_argv(char** argv){
+    int argc = 0;
+    while (argv[argc] != NULL){
+        argc++;
+    }
+    return argc;
+}
+
+
 int external_execute(int argc, const char * argv[]) {
     pid_t childPid;
     int execution_return;
@@ -234,6 +247,9 @@ int external_execute(int argc, const char * argv[]) {
     return execution_return;
 }
 
+
+int execute_script(int argc, const char *argv[]);
+
 int execute(int argc, const char *argv[]) {
 
     if (argc == 0) {
@@ -249,16 +265,45 @@ int execute(int argc, const char *argv[]) {
         return shell_exit(argc, argv);
     }
 
+    reti = regexec(&regex, argv[0], 0, NULL, 0);
+
+    if (!reti) {
+        return execute_script(argc, argv);
+    }
+
     return external_execute(argc, argv);
 }
 
-int count_argv(char** argv){
-    int argc = 0;
-    while (argv[argc] != NULL){
-        argc++;
+int execute_script(int argc, const char *argv[]){
+    char ** local_argv;
+    char * local_line = NULL;
+    int local_argc;
+    ssize_t read;
+    size_t len = 0;
+
+    char filename[20];
+    memcpy(filename, &argv[0][2], sizeof(argv[0]));
+    FILE *file;
+    file = fopen(filename, "r");
+
+    if (file == NULL)
+    {
+        printf("%s %s\n", "There is no such file:", filename);
+    } else if (file) {
+        while ((read = getline(&local_line, &len, file)) != -1) {
+            local_argv = split_line(local_line);
+            local_argc = count_argv(local_argv);
+
+            execute(local_argc, local_argv);
+
+            free(local_line);
+            free(local_argv);
+        }
     }
-    return argc;
 }
+
+
+
 
 int loop(){
     char * line;
@@ -297,6 +342,8 @@ int main(){
     int exit_code;
     char *original_path;
     char environment_var[1024] = "PATH=";
+
+    reti = regcomp(&regex, "^[.][/]", 0);
 
     original_path = getcwd(cwd_bufer, 1024);
     strcat(environment_var, original_path);

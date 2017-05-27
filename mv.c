@@ -17,7 +17,7 @@
 static int help_flag = 0;
 static int force_rewrite = 0;
 static int wrong_options = 0;
-static char *help = "cp [-h|--help] [-f] <file1> <file2> \n cp [-h|--help] [-f]  <file1> <file2> <file3>... <dir>";
+static char *help = "mv [-h|--help] [-f] <file1> <file2> \n mv [-h|--help] [-f]  <file1> <file2> <file3>... <dir>";
 struct stat st = {0};
 
 static struct option long_options[] =
