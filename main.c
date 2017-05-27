@@ -225,6 +225,20 @@ int count_argv(char** argv){
     return argc;
 }
 
+int remove_sharp_from_line(char * line)
+{
+    for (int i = 0; i < sizeof(line); i++)
+    {
+        if (line[i] == '#')
+        {
+            line[i] = NULL;
+            break;
+        }
+    }
+
+    return 0;
+}
+
 
 int external_execute(int argc, const char * argv[]) {
     pid_t childPid;
@@ -324,6 +338,7 @@ int loop(){
 
 
         line = read_line();
+        remove_sharp_from_line(line);
         argv = split_line(line);
         argc = count_argv(argv);
 
