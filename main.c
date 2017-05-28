@@ -187,6 +187,14 @@ int shell_exit(int argc, const char * argv[]) {
     exit(exit_code);
 }
 
+int shell_echo(int argc, const char * argv[]) {
+    for (int i = 0; i < argc; i++) {
+        printf("%s ", argv[i]);
+    }
+    printf("\n");
+    return 0;
+}
+
 int export_variable(int argc, const char * argv[]){
 
     if (argc > 1)
@@ -237,9 +245,10 @@ int assign_variable(char * line){
 char ** substitute_variables(int argc, const char * argv[]) {
     char ** substituted_argv = malloc(argc*sizeof(char *));
     char name_of_variable[256];
-    char * value;
+
 
     for (int i = 0; i < argc; i++){
+        char * value = NULL;
         if (argv[i][0] == '$') {
             memcpy(name_of_variable, &argv[i][1], sizeof(argv[i])-1);
             name_of_variable[sizeof(argv[i])-1] ='\0';
@@ -365,6 +374,9 @@ int execute(int argc, const char *argv[]) {
     }
     if (strcmp(argv[0], "export") == 0) {
         return export_variable(argc, argv);
+    }
+    if (strcmp(argv[0], "echo") == 0) {
+        return shell_echo(argc, argv);
     }
 
     reti = regexec(&scriptRegex, argv[0], 0, NULL, 0);
