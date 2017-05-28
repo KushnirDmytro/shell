@@ -10,7 +10,8 @@
 #include <regex.h>
 
 
-static regex_t regex;
+static regex_t scriptRegex;
+static regex_t assignRegex;
 static int reti;
 
 int shell_pwd(int argc, const char * argv[]);
@@ -18,7 +19,18 @@ int shell_cd(int argc, const char * argv[]);
 int shell_exit(int argc, const char * argv[]);
 static int help_flag = 0;
 char *cwd_bufer;
-long path_max;
+
+
+struct pair {
+    char * key;
+    char * value;
+};
+
+typedef struct pair pair;
+
+static pair * list_of_variables;
+static int number_of_variables = 0;
+
 
 int shell_pwd(int argc, const char * argv[]){
     static char help[] = "pwd [-h|--help] – вивести поточний шлях ";
@@ -175,7 +187,80 @@ int shell_exit(int argc, const char * argv[]) {
     exit(exit_code);
 }
 
+int export_variable(int argc, const char * argv[]){
 
+    if (argc > 1)
+    {
+        reti = regexec(&assignRegex, argv[1], 0, NULL, 0);
+        if (!reti) {
+            assign_variable(argv[1]);
+            putenv(argv[1]);
+        } else
+        {
+            for (int i = 0; i < number_of_variables; i++){
+                if (strcmp(list_of_variables[i].key, argv[1]) == 0){
+                    char *environment_variable;
+                    strcpy(environment_variable, list_of_variables[i].key);
+                    strcat(environment_variable, "=");
+                    strcat(environment_variable, list_of_variables[i].value);
+                    putenv(environment_variable);
+                    break;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int assign_variable(char * line){
+    pair key_value;
+
+    for (int i = 0; i < sizeof(line); i++)
+    {
+        if (line[i] == '=')
+        {
+            key_value.key = (char *) malloc(i);
+            memcpy(key_value.key, line, i);
+            key_value.value = (char *) malloc(sizeof(line)-i-1);
+            memcpy(key_value.value, &line[i+1], sizeof(line)-i-1);
+            break;
+        }
+    }
+
+    list_of_variables[number_of_variables] = key_value;
+    number_of_variables++;
+
+    return 0;
+}
+
+char ** substitute_variables(int argc, const char * argv[]) {
+    char ** substituted_argv = malloc(argc*sizeof(char *));
+    char name_of_variable[256];
+    char * value;
+
+    for (int i = 0; i < argc; i++){
+        if (argv[i][0] == '$') {
+            memcpy(name_of_variable, &argv[i][1], sizeof(argv[i])-1);
+            name_of_variable[sizeof(argv[i])-1] ='\0';
+
+            for (int j = 0; j < number_of_variables; j++) {
+                if (strcmp(name_of_variable, list_of_variables[j].key) == 0) {
+                    value = list_of_variables[j].value;
+                    break;
+                }
+            }
+            if (value == NULL) {
+                value = getenv(name_of_variable);
+            }
+            if (value == NULL) {
+                value = argv[i];
+            }
+        } else value = argv[i];
+        substituted_argv[i] = value;
+    }
+    return substituted_argv;
+}
 
 #define LSH_TOK_BUFSIZE 64
 #define LSH_TOK_DELIM " \t\r\n\a"
@@ -254,7 +339,7 @@ int external_execute(int argc, const char * argv[]) {
             }
         default:
             if (wait(NULL) == -1){
-                printf("%s \n", "some wrong");
+                printf("%s \n", "something wrong");
             }
     }
 
@@ -278,11 +363,20 @@ int execute(int argc, const char *argv[]) {
     if (strcmp(argv[0], "exit") == 0) {
         return shell_exit(argc, argv);
     }
+    if (strcmp(argv[0], "export") == 0) {
+        return export_variable(argc, argv);
+    }
 
-    reti = regexec(&regex, argv[0], 0, NULL, 0);
+    reti = regexec(&scriptRegex, argv[0], 0, NULL, 0);
 
     if (!reti) {
         return execute_script(argc, argv);
+    }
+
+    reti = regexec(&assignRegex, argv[0], 0, NULL, 0);
+
+    if (!reti) {
+        return assign_variable(argv[0]);
     }
 
     return external_execute(argc, argv);
@@ -341,6 +435,7 @@ int loop(){
         remove_sharp_from_line(line);
         argv = split_line(line);
         argc = count_argv(argv);
+        argv = substitute_variables(argc, argv);
 
         execute(argc, argv);
 
@@ -357,8 +452,10 @@ int main(){
     int exit_code;
     char *original_path;
     char environment_var[1024] = "PATH=";
+    list_of_variables = malloc(256 * sizeof(pair));
 
-    reti = regcomp(&regex, "^[.][/]", 0);
+    reti = regcomp(&scriptRegex, "^[.][/]", 0);
+    reti = regcomp(&assignRegex, "=", 0);
 
     original_path = getcwd(cwd_bufer, 1024);
     strcat(environment_var, original_path);
