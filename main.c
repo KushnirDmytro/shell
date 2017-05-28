@@ -401,6 +401,7 @@ int execute_script(int argc, const char *argv[]){
         while ((read = getline(&local_line, &len, file)) != -1) {
             local_argv = split_line(local_line);
             local_argc = count_argv(local_argv);
+            local_argv = substitute_variables(local_argc, local_argv);
 
             execute(local_argc, local_argv);
 
