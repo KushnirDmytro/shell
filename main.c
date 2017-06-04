@@ -517,8 +517,8 @@ int execute_all (special_argv subbcomands) {
                 out_in_file = 1;
                 err_in_file = 1;
                 strcpy(filename, subbcomands.list_of_argv[i][j-1]);
-                subbcomands.list_of_argv[i][j-1] = NULL;
-                subbcomands.list_of_argc[i] = j - 1;
+                subbcomands.list_of_argv[i][j-2] = NULL;
+                subbcomands.list_of_argc[i] = j - 2;
                 break;
             } else if (strcmp(subbcomands.list_of_argv[i][j], "&") == 0) {
                 out_garbage = 1;
