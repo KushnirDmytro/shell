@@ -9,6 +9,7 @@
 #include <string.h>
 #include <regex.h>
 #include <time.h>
+#include <unistd.h>
 
 
 static regex_t regex;
@@ -208,9 +209,6 @@ int main(int argc, const char* argv[])
                     }
             }
         }
-
-
-
 
     return 0;
 }
