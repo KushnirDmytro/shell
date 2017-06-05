@@ -17,3 +17,17 @@ add_executable(rm ${RM_SOURCE_FILES})
 add_executable(mkdir ${MKDIR_SOURCE_FILES})
 add_executable(mv ${MV_SOURCE_FILES})
 add_executable(grep ${GREP_SOURCE_FILES})
+
+include(PVS-Studio.cmake)
+
+#pvs_studio_add_target(TARGET analyze ALL
+#       FORMAT errorfile
+#      PREPROCESSOR gcc
+#        LOG "Lab_2_shell.tasks"
+#     ANALYZE Lab_2_shell
+#    )
+
+pvs_studio_add_target(TARGET analyze ALL
+        OUTPUT FORMAT errorfile
+        ANALYZE at_shell
+        )

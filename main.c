@@ -10,6 +10,7 @@
 #include <regex.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <zconf.h>
 
 static regex_t scriptRegex;
 static regex_t assignRegex;
@@ -42,13 +43,13 @@ static int number_of_variables = 0;
 
 int shell_pwd(int argc, const char * argv[], int out_fd){
     static char help[] = "pwd [-h|--help] – вивести поточний шлях\n";
-    char *cwd_bufer = malloc(sizeof(char));
+    char *cwd_bufer = malloc(PATH_MAX);
     int wrong_options = 0;
     help_flag = 0;
     int option_index = 0;
     int opt;
 
-    char *cp_ptr = malloc(sizeof(char));
+    char *cp_ptr = malloc(PATH_MAX);
 
     static struct option long_options[] =
             {
@@ -230,7 +231,7 @@ int export_variable(int argc, const char * argv[]){
         {
             for (int i = 0; i < number_of_variables; i++){
                 if (strcmp(list_of_variables[i].key, argv[1]) == 0){
-                    char *environment_variable;
+                    char *environment_variable = malloc(1024);
                     strcpy(environment_variable, list_of_variables[i].key);
                     strcat(environment_variable, "=");
                     strcat(environment_variable, list_of_variables[i].value);
@@ -247,13 +248,13 @@ int export_variable(int argc, const char * argv[]){
 int assign_variable(char * line){
     pair key_value;
 
-    for (int i = 0; i < sizeof(line); i++)
+    for (int i = 0; i < strlen(line); i++)
     {
         if (line[i] == '=')
         {
-            key_value.key = (char *) malloc(i);
+            key_value.key = (char *) malloc(i+1);
             memcpy(key_value.key, line, i);
-            key_value.value = (char *) malloc(sizeof(line)-i-1);
+            key_value.value = (char *) malloc(sizeof(line)-i);
             memcpy(key_value.value, &line[i+1], sizeof(line)-i-1);
             break;
         }
@@ -273,8 +274,8 @@ char ** substitute_variables(int argc, const char * argv[]) {
     for (int i = 0; i < argc; i++){
         char * value = NULL;
         if (argv[i][0] == '$') {
-            memcpy(name_of_variable, &argv[i][1], sizeof(argv[i])-1);
-            name_of_variable[sizeof(argv[i])-1] ='\0';
+            memcpy(name_of_variable, &argv[i][1], strlen(argv[i])-1);
+            name_of_variable[strlen(argv[i])-1] ='\0';
 
             for (int j = 0; j < number_of_variables; j++) {
                 if (strcmp(name_of_variable, list_of_variables[j].key) == 0) {
@@ -289,9 +290,10 @@ char ** substitute_variables(int argc, const char * argv[]) {
                 value = argv[i];
             }
         } else value = argv[i];
-        substituted_argv[i] = value;
+        substituted_argv[i] = malloc(sizeof(value)+1);
+        strcpy(substituted_argv[i], value);
     }
-    substituted_argv[argc+1] = NULL;
+    substituted_argv[argc] = NULL;
     return substituted_argv;
 }
 
@@ -347,19 +349,20 @@ struct special_argv split_subcommands(int argc, char ** argv){
 
     subcommands.len = number_of_subbcomands;
     subcommands.list_of_argc = calloc(argc, sizeof(int));
-    subcommands.list_of_argv = malloc(sizeof(char **));
-    subcommands.list_of_argv[0] = malloc(sizeof(char *));
+    subcommands.list_of_argv = malloc((argc+1)*sizeof(char **));
+    subcommands.list_of_argv[0] = malloc((argc+1) * sizeof(char *));
     int index = 0;
     for (int i = 0; i < argc; i++ ) {
         if (strcmp(argv[i], "|") == 0){
             subcommands.list_of_argv[index][subcommands.list_of_argc[index]+1] = NULL;
             index++;
-            subcommands.list_of_argv[index] = malloc(sizeof(char *));
+            subcommands.list_of_argv[index] = malloc((argc+1) * sizeof(char *));
             subcommands.list_of_argc[index] = 0;
-            subcommands.list_of_argv[index] = malloc(argc * sizeof(char ));
+            //subcommands.list_of_argv[index] = malloc(argc * sizeof(char ));
         }
         else
         {
+            subcommands.list_of_argv[index][subcommands.list_of_argc[index]] = malloc(sizeof(argv[i]));
             subcommands.list_of_argv[index][subcommands.list_of_argc[index]] = strdup(argv[i]);
             //strcpy(list_of_argv[index][argc_subbcomand[index]], argv[i]);
             subcommands.list_of_argc[index]++;
@@ -381,7 +384,7 @@ int count_argv(char** argv){
 
 int remove_sharp_from_line(char * line)
 {
-    for (int i = 0; i < sizeof(line); i++)
+    for (int i = 0; i < strlen(line); i++)
     {
         if (line[i] == '#')
         {
@@ -415,10 +418,15 @@ int external_execute(int argc, const char * argv[], int input_fd, int out_fd, in
                 exit(-1);
             }
         default:
-            if (out_fd == STDOUT_FILENO){
-                if (wait(NULL) == -1)
-                printf("%s \n", "something wrong");
-            } else close(out_fd);
+            if (out_fd == 1) {
+                if (wait(NULL) == -1) {
+                    printf("%s \n", "something wrong");
+                }
+            }
+            //if (out_fd == STDOUT_FILENO){
+                //if (wait(NULL) == -1)
+                //printf("%s \n", "something wrong");
+            //} else close(out_fd);
     }
 
     return execution_return;
@@ -486,6 +494,7 @@ int execute_all (special_argv subbcomands) {
     int input_fd = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
     int err_fd = STDERR_FILENO;
+    int execute_code;
 
     for (int i = 0; i < subbcomands.len; i++){
         out_in_file = 0;
@@ -530,7 +539,7 @@ int execute_all (special_argv subbcomands) {
 
         if (!input_from_file) {
             if (i > 0) {
-                input_fd = pipe_fd[1];
+                input_fd = pipe_fd[0];
             } else
             {
                 input_fd = STDIN_FILENO;
@@ -553,7 +562,7 @@ int execute_all (special_argv subbcomands) {
                     if (pipe(pipe_fd) == -1) {
                         perror("pipe");
                         exit(EXIT_FAILURE);
-                    } else out_fd = pipe_fd[0];
+                    } else out_fd = pipe_fd[1];
                 } else out_fd = STDOUT_FILENO;
             }
         } else {
@@ -564,10 +573,14 @@ int execute_all (special_argv subbcomands) {
             err_fd = STDERR_FILENO;
         } else err_fd = open(filename, O_CREAT | O_RDWR, 0666);
 
-        execute(subbcomands.list_of_argc[i], subbcomands.list_of_argv[i], input_fd, out_fd, err_fd);
+        execute_code = execute(subbcomands.list_of_argc[i], subbcomands.list_of_argv[i], input_fd, out_fd, err_fd);
+        if (execute_code != 0)
+        {
+            return execute_code;
+        }
 
     }
-
+    return execute_code;
 }
 
 int execute_script(int argc, const char *argv[]){
@@ -578,8 +591,8 @@ int execute_script(int argc, const char *argv[]){
     ssize_t read;
     size_t len = 0;
 
-    char filename[20];
-    memcpy(filename, &argv[0][2], sizeof(argv[0]));
+    char * filename = malloc(sizeof(argv[0]));
+    strcpy(filename, &argv[0][2]);
     FILE *file;
     file = fopen(filename, "r");
 
@@ -600,7 +613,7 @@ int execute_script(int argc, const char *argv[]){
                 for (int j = 0; j < local_subcommands.list_of_argc[i]; j++)
                 {
                     free(local_subcommands.list_of_argv[j]);
-                    break;
+                    //break;
                 }
             }
             //free(local_subcommands.list_of_argc);
@@ -608,6 +621,8 @@ int execute_script(int argc, const char *argv[]){
             //free(local_argv);
         }
     }
+    free(filename);
+    return 0;
 }
 
 
@@ -619,8 +634,8 @@ int execute_script(int argc, const char *argv[]){
 int loop(){
     char * line;
     char ** argv;
-    char *cp_ptr;
-    char *cwd_bufer = malloc(sizeof(char));
+    char *cp_ptr = malloc(PATH_MAX+1);
+    char *cwd_bufer = malloc(PATH_MAX+1);
     int argc;
     special_argv subcommands;
 
@@ -657,9 +672,9 @@ int loop(){
         for (int i = 0; i < subcommands.len; i++) {
             for (int j = 0; j < subcommands.list_of_argc[i]; j++)
             {
-                free(subcommands.list_of_argv[j]);
-                break;
+                free(subcommands.list_of_argv[i][j]);
             }
+            //free(subcommands.list_of_argv[i]);
         }
         free(subcommands.list_of_argc);
         free(subcommands.list_of_argv);
@@ -675,7 +690,7 @@ int main() {
     int exit_code;
     char *original_path;
     char environment_var[1024] = "PATH=";
-    char *cwd_bufer = malloc(sizeof(char));
+    char *cwd_bufer = malloc(PATH_MAX+1);
     list_of_variables = malloc(256 * sizeof(pair));
 
     reti = regcomp(&scriptRegex, "^[.][/]", 0);

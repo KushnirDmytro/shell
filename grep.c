@@ -10,6 +10,8 @@
 #include <regex.h>
 #include <time.h>
 #include <ctype.h>
+#include <zconf.h>
+#include <fcntl.h>
 
 static regex_t regex;
 static int reti;
@@ -33,8 +35,9 @@ static struct option long_options[] =
 
 int main(int argc, const char* argv[])
 {
-    FILE *file;
+    int file;
     int opt;
+    int fd;
     int option_index;
 
     while (optind < argc) {
@@ -56,7 +59,10 @@ int main(int argc, const char* argv[])
                     help_flag = 1;
                     break;
                 case 'f':
-                    if (optarg) filename = optarg;
+                    if (argv[optind]) {
+                        filename = argv[optind];
+                        optind++;
+                    }
                     else wrong_options = 1;
                     break;
                 default:
@@ -71,7 +77,7 @@ int main(int argc, const char* argv[])
     }
 
     if (filename) {
-        file = fopen(filename, "r");
+        file = open(filename, O_RDONLY);
         if (!file) wrong_options = 1;
     }
 
@@ -93,13 +99,15 @@ int main(int argc, const char* argv[])
 
     } else
     {
-        if (!filename) {
-            FILE *file = stdin;
+        if (filename) {
+            dup2(file, 0);
         }
-
         char * line = malloc(1000);
-        while (scanf("%s", line))
+        while (scanf("%s", line) != EOF)
         {
+            if (strcmp(line, "exitGREP") == 0) {
+                return 0;
+            }
 
             if (ignore_flag) {
                 char * lowercase = malloc(sizeof(line));
