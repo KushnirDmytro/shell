@@ -396,8 +396,16 @@ int remove_sharp_from_line(char * line)
     return 0;
 }
 
+int print_from_pipe(int fd) {
+    char buf[BUFSIZ] = {0};
+    printf("\n");
+    while(read(fd, buf, BUFSIZ) != 0) {
+        printf("%s\n", buf);
+    }
+    return 0;
+}
 
-int external_execute(int argc, const char * argv[], int input_fd, int out_fd, int err_fd) {
+int external_execute(int argc, const char * argv[], int input_fd, int out_fd, int err_fd, int child_to_close, int parent_to_close) {
     pid_t childPid;
     int execution_return = 0;
 
@@ -405,29 +413,28 @@ int external_execute(int argc, const char * argv[], int input_fd, int out_fd, in
     switch (childPid = fork()) {
         case -1:
             /*handle error*/
-            printf("Error fork, code %d: %s", errno, strerror(errno));
+            printf("Error fork, code %d: %s\n", errno, strerror(errno));
             execution_return = -1;
         case 0:
             /*perform action specific to child*/
-            {
-                dup2(out_fd, 1);
-                dup2(input_fd, 0);
-                dup2(err_fd, 2);
-                execution_return = execvp(argv[0], argv);
-                printf("Error executing, code %d: %s", errno, strerror(errno));
-                exit(-1);
-            }
-        default:
-            if (out_fd == 1) {
-                if (wait(NULL) == -1) {
-                    printf("%s \n", "something wrong");
-                }
-            }
+        {
+            dup2(out_fd, 1);
+            dup2(input_fd, 0);
+            dup2(err_fd, 2);
+            if (child_to_close > -1) close(child_to_close);
+            execution_return = execvp(argv[0], argv);
+            printf("Error executing, code %d: %s\n", errno, strerror(errno));
+            exit(-1);
+        }
+        default: {
+            if (parent_to_close > -1) close(parent_to_close);
+        }
+    }
             //if (out_fd == STDOUT_FILENO){
                 //if (wait(NULL) == -1)
                 //printf("%s \n", "something wrong");
             //} else close(out_fd);
-    }
+
 
     return execution_return;
 }
@@ -435,7 +442,7 @@ int external_execute(int argc, const char * argv[], int input_fd, int out_fd, in
 
 int execute_script(int argc, const char *argv[]);
 
-int execute(int argc, const char *argv[], int input_fd, int out_fd, int error_fd) {
+int execute(int argc, const char *argv[], int input_fd, int out_fd, int error_fd, int child_to_close, int parent_to_close) {
 
     if (argc == 0) {
         return 1;
@@ -481,7 +488,7 @@ int execute(int argc, const char *argv[], int input_fd, int out_fd, int error_fd
         return assign_variable(argv[0]);
     }
 
-    return external_execute(argc, argv, input_fd, out_fd, error_fd);
+    return external_execute(argc, argv, input_fd, out_fd, error_fd, child_to_close, parent_to_close);
 }
 
 int execute_all (special_argv subbcomands) {
@@ -490,6 +497,8 @@ int execute_all (special_argv subbcomands) {
     int input_from_file;
     int out_garbage;
     char filename[256];
+    int child_to_close = -1;
+    int parent_to_close = -1;
     int pipe_fd[2];
     int input_fd = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
@@ -497,6 +506,8 @@ int execute_all (special_argv subbcomands) {
     int execute_code;
 
     for (int i = 0; i < subbcomands.len; i++){
+        child_to_close = -1;
+        parent_to_close = -1;
         out_in_file = 0;
         err_in_file = 0;
         out_garbage = 0;
@@ -538,8 +549,10 @@ int execute_all (special_argv subbcomands) {
         }
 
         if (!input_from_file) {
-            if (i > 0) {
+            if (i > 0 && pipe_fd[0] > 0) {
                 input_fd = pipe_fd[0];
+                child_to_close = pipe_fd[1];
+                parent_to_close = pipe_fd[0];
             } else
             {
                 input_fd = STDIN_FILENO;
@@ -558,28 +571,38 @@ int execute_all (special_argv subbcomands) {
             {
                 out_fd = open("/dev/null", 0);
             } else {
-                if (i < subbcomands.len - 1) {
                     if (pipe(pipe_fd) == -1) {
                         perror("pipe");
                         exit(EXIT_FAILURE);
-                    } else out_fd = pipe_fd[1];
-                } else out_fd = STDOUT_FILENO;
+                    } else {
+                        out_fd = pipe_fd[1];
+                        child_to_close = pipe_fd[0];
+                        parent_to_close = pipe_fd[1];
+                    }
             }
         } else {
             out_fd = open(filename, O_CREAT | O_RDWR, 0666);
+            pipe_fd[0] = -1;
         }
 
         if (!err_in_file) {
             err_fd = STDERR_FILENO;
         } else err_fd = open(filename, O_CREAT | O_RDWR, 0666);
 
-        execute_code = execute(subbcomands.list_of_argc[i], subbcomands.list_of_argv[i], input_fd, out_fd, err_fd);
+        execute_code = execute(subbcomands.list_of_argc[i], subbcomands.list_of_argv[i], input_fd, out_fd, err_fd, child_to_close, parent_to_close);
         if (execute_code != 0)
         {
             return execute_code;
         }
 
     }
+
+    if (!out_in_file)
+    {
+        input_fd = pipe_fd[0];
+        print_from_pipe(input_fd);
+    }
+
     return execute_code;
 }
 
@@ -626,11 +649,6 @@ int execute_script(int argc, const char *argv[]){
 }
 
 
-
-
-
-
-
 int loop(){
     char * line;
     char ** argv;
@@ -661,7 +679,7 @@ int loop(){
         /*for (int i = 0; i < subcommands.len; i++){
             for (int j = 0; j < subcommands.list_of_argc[i]; j++){
                 printf("%s ", subcommands.list_of_argv[i][j]);
-            }
+            }fl
             printf("\n");
         }*/
 

@@ -103,7 +103,7 @@ int main(int argc, const char* argv[])
             dup2(file, 0);
         }
         char * line = malloc(1000);
-        while (scanf("%s", line) != EOF)
+        while (scanf("%s", line) != EOF )
         {
             if (strcmp(line, "exitGREP") == 0) {
                 return 0;
@@ -123,6 +123,6 @@ int main(int argc, const char* argv[])
             }
         }
     }
-
+    fflush(NULL);
     return 0;
 }
